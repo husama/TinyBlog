@@ -6,6 +6,7 @@ import com.husama.dao.IBaseDao;
 import com.husama.model.BaseModel;
 import com.husama.util.jdbc.JDBCUtils;
 import com.husama.util.reflect.ReflectUtils;
+import jdk.nashorn.internal.scripts.JD;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
@@ -70,6 +71,7 @@ public class BaseDaoImpl<T extends BaseModel> implements IBaseDao<T> {
 
             fillPreparedStatement(t, preparedStatement, persistenceFieldsName);
             preparedStatement.executeUpdate();
+            JDBCUtils.release(preparedStatement);
 
             List<String> manyToManyFieldsName = getManyToManyFiledsName();
 
@@ -85,6 +87,7 @@ public class BaseDaoImpl<T extends BaseModel> implements IBaseDao<T> {
                                 + " ("+t.getClass().getSimpleName()+"_id,"+fieldName+"_id) "+"values ("+t.getId()+","+model.getId();
                         Statement statement = connection.createStatement();
                         statement.execute(sql);
+                        JDBCUtils.release(statement);
                     }
 
                 }catch (Exception e){
@@ -108,7 +111,7 @@ public class BaseDaoImpl<T extends BaseModel> implements IBaseDao<T> {
             try {
                 //reset autocommit
                 connection.setAutoCommit(true);
-                connection.close();
+                JDBCUtils.release(connection);
 
             } catch (SQLException e) {
                 // TODO Auto-generatedcatch block
@@ -153,6 +156,7 @@ public class BaseDaoImpl<T extends BaseModel> implements IBaseDao<T> {
             fillPreparedStatement(t, preparedStatement, persistenceFieldsName);
 
             preparedStatement.executeUpdate();
+            JDBCUtils.release(preparedStatement);
 
             // TODO: 16-9-20  
 
@@ -173,7 +177,8 @@ public class BaseDaoImpl<T extends BaseModel> implements IBaseDao<T> {
             try {
                 //reset autocommit
                 connection.setAutoCommit(true);
-                connection.close();
+                JDBCUtils.release(connection);
+
 
             } catch (SQLException e) {
                 // TODO Auto-generatedcatch block
@@ -239,17 +244,11 @@ public class BaseDaoImpl<T extends BaseModel> implements IBaseDao<T> {
                 preparedStatement.setObject(i,o);
             }
             preparedStatement.execute();
+            JDBCUtils.release(preparedStatement);
         }catch (SQLException e){
             e.printStackTrace();
         }finally {
-            try {
-                connection.close();
-
-            } catch (SQLException e) {
-                // TODO Auto-generatedcatch block
-                e.printStackTrace();
-
-            }
+                JDBCUtils.release(connection);
         }
     }
 
@@ -278,14 +277,7 @@ public class BaseDaoImpl<T extends BaseModel> implements IBaseDao<T> {
         }catch (SQLException e){
             e.printStackTrace();
         }finally {
-            try {
-                connection.close();
-
-            } catch (SQLException e) {
-                // TODO Auto-generatedcatch block
-                e.printStackTrace();
-
-            }
+            JDBCUtils.release(connection);
         }
         return null;
     }

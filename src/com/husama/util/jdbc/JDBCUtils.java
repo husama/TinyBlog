@@ -24,7 +24,7 @@ public class JDBCUtils {
         release(conn);
     }
 
-    private static void release(AutoCloseable ac){
+    public static void release(AutoCloseable ac){
         if(ac != null){
             try {
                 ac.close();
