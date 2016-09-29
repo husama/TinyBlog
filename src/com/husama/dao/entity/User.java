@@ -1,24 +1,18 @@
-package com.husama.model;
+package com.husama.dao.entity;
 
-import com.husama.annotation.dao.Persistence;
 import static com.husama.constant.UserRoles.*;
 
 /**
- * Created by husama on 16-8-28.
+ * Created by husama on 16-9-26.
  */
-public class User extends BaseModel{
+public class User extends BaseEntity{
 
-
-    @Persistence
     private String email;
 
-    @Persistence
     private String nickname;
 
-    @Persistence
     private String password;
 
-    @Persistence
     private String role = ROLE_USER;
 
     public User(String email, String password,String role){
@@ -62,6 +56,4 @@ public class User extends BaseModel{
     public void setPassword(String password) {
         this.password = password;
     }
-
-
 }

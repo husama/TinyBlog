@@ -1,200 +1,32 @@
 package com.husama.dao.impl;
 
-import com.husama.annotation.dao.ManyToMany;
-import com.husama.annotation.dao.Persistence;
 import com.husama.dao.IBaseDao;
-import com.husama.model.BaseModel;
 import com.husama.util.jdbc.JDBCUtils;
 import com.husama.util.reflect.ReflectUtils;
-import jdk.nashorn.internal.scripts.JD;
 
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-
+import java.text.SimpleDateFormat;
+import java.util.*;
 
 /**
- * Created by husama on 16-9-19.
+ * Created by husama on 16-9-26.
  */
-public class BaseDaoImpl<T extends BaseModel> implements IBaseDao<T> {
+public abstract class BaseDaoImpl<T> implements IBaseDao<T>{
 
     protected Class<T> entityClass;
     protected String tableName;
-
     /*
-     * ensure type of entity
-     * */
+    * ensure type of entity
+    * */
+    @SuppressWarnings("unchecked")
     public BaseDaoImpl(){
         Type genericSuperClass = getClass().getGenericSuperclass();
         entityClass = (Class)((ParameterizedType)genericSuperClass).getActualTypeArguments()[0];
         tableName = entityClass.getSimpleName().toLowerCase();
-    }
-
-    @Override
-    public void save(T t) {
-
-        if (t == null || contains(t)) {
-            return;
-        }
-
-        Connection connection = null;
-        PreparedStatement preparedStatement = null;
-        try {
-            connection = JDBCUtils.getConnection();
-            connection.setAutoCommit(false);//transaction
-
-            List<String> persistenceFieldsName = getPersistenceFiledsName();
-            StringBuilder sqlBuilder = new StringBuilder("insert into " + tableName + " (");
-
-            int length = persistenceFieldsName.size();
-            for (int i = 0; i < length - 1; i++) {
-
-                sqlBuilder.append(persistenceFieldsName.get(i) + ", ");
-            }
-            sqlBuilder.append(persistenceFieldsName.get(length - 1) + ") values(");
-
-            for (int i = 0; i < length - 1; i++) {
-
-                sqlBuilder.append("?, ");
-            }
-            sqlBuilder.append("?)");
-
-            String sql = sqlBuilder.toString();
-            preparedStatement = connection.prepareStatement(sql);
-
-            fillPreparedStatement(t, preparedStatement, persistenceFieldsName);
-            preparedStatement.executeUpdate();
-            JDBCUtils.release(preparedStatement);
-
-            List<String> manyToManyFieldsName = getManyToManyFiledsName();
-
-
-            length = manyToManyFieldsName.size();
-            for (String fieldName : manyToManyFieldsName) {
-                try {
-                    Method method = entityClass.getMethod("get"+fieldName,void.class);
-                    Collection<BaseModel> collection = (Collection<BaseModel>)method.invoke(t);
-                    for(BaseModel model : collection){
-                        sql = "insert into " + tableName + "_"
-                                + fieldName.substring(0,fieldName.length()-1)
-                                + " ("+t.getClass().getSimpleName()+"_id,"+fieldName+"_id) "+"values ("+t.getId()+","+model.getId();
-                        Statement statement = connection.createStatement();
-                        statement.execute(sql);
-                        JDBCUtils.release(statement);
-                    }
-
-                }catch (Exception e){
-                    // TODO: 16-9-20
-                    e.printStackTrace();
-                }
-            }
-            connection.commit();
-        } catch (SQLException e) {
-            try {
-                //operation exception , rollback
-                connection.rollback();
-            } catch (SQLException e1) {
-                // TODO Auto-generatedcatch block
-                e1.printStackTrace();
-
-            }
-
-            e.printStackTrace();
-        } finally {
-            try {
-                //reset autocommit
-                connection.setAutoCommit(true);
-                JDBCUtils.release(connection);
-
-            } catch (SQLException e) {
-                // TODO Auto-generatedcatch block
-                e.printStackTrace();
-
-            }
-        }
-    }
-
-    @Override
-    public void update(T t) {
-        if(t == null || !contains(t)){
-            return;
-        }
-
-        Connection connection = null;
-        PreparedStatement preparedStatement = null;
-        try {
-            connection = JDBCUtils.getConnection();
-
-            connection.setAutoCommit(false);
-
-            List<String> persistenceFieldsName = getPersistenceFiledsName();
-            persistenceFieldsName.remove("id");
-            StringBuilder sqlBuilder = new StringBuilder("update "+tableName+" set ");
-
-            int length = persistenceFieldsName.size();
-            for(int i=0; i<length; i++){
-                if(i < length-1){
-                    sqlBuilder.append(persistenceFieldsName.get(i)+" = ?, ");
-                }else {
-                    sqlBuilder.append(persistenceFieldsName.get(i)+" = ? " );
-                }
-
-            }
-
-            sqlBuilder.append("where id = "+ t.getId());
-
-            String sql = sqlBuilder.toString();
-            preparedStatement = connection.prepareStatement(sql);
-
-            fillPreparedStatement(t, preparedStatement, persistenceFieldsName);
-
-            preparedStatement.executeUpdate();
-            JDBCUtils.release(preparedStatement);
-
-            // TODO: 16-9-20  
-
-            connection.commit();
-
-        }catch (SQLException e) {
-            try {
-                //operation exception , rollback
-                connection.rollback();
-            } catch (SQLException e1) {
-                // TODO Auto-generatedcatch block
-                e1.printStackTrace();
-
-            }
-
-            e.printStackTrace();
-        } finally {
-            try {
-                //reset autocommit
-                connection.setAutoCommit(true);
-                JDBCUtils.release(connection);
-
-
-            } catch (SQLException e) {
-                // TODO Auto-generatedcatch block
-                e.printStackTrace();
-
-            }
-        }
-    }
-    @Override
-    public void saveOrUpdate(T t) {
-
-    }
-
-    @Override
-    public T get(long id) {
-        return null;
     }
 
     @Override
@@ -203,8 +35,62 @@ public class BaseDaoImpl<T extends BaseModel> implements IBaseDao<T> {
     }
 
     @Override
-    public void delete(T t) {
+    public boolean save(T t) {
+        if (t == null || contains(t)) {
+            return false;
+        }
 
+
+        Field[] fields = ReflectUtils.getAllFields(entityClass);
+        String[] fieldNames = new String[fields.length];
+        StringBuilder sqlBuilder = new StringBuilder("insert into " + tableName + " (");
+        Object[] objects = new Object[fields.length];
+
+        for (int i=0; i<fields.length; i++){
+            fieldNames[i] = fields[i].getName();
+            sqlBuilder.append(fieldNames[i] + ",");
+            objects[i] = getObjectByFieldName(t,fieldNames[i]);
+        }
+
+        //去掉最后一个,符号insert insert into table_name( , , ) values(
+        sqlBuilder = new StringBuilder(sqlBuilder.substring(0, sqlBuilder.lastIndexOf(","))+") values(");
+
+        //拼装预编译SQL语句insert insert into table_name( , , )  values(?,?,?,
+        for(int j = 0; j < fields.length; j++) {
+            sqlBuilder.append("?,");
+        }
+
+        //去掉SQL语句最后一个,符号insert insert into table_name( , , )  values(?,?,?);
+        String sql = sqlBuilder.substring(0, sqlBuilder.lastIndexOf(",")) + ")";
+
+        Connection connection = JDBCUtils.getConnection();
+
+        int result = executeUpdateSQL(sql,objects);
+
+        JDBCUtils.release(connection);
+
+        return result==1;
+    }
+
+    @Override
+    public void saveOrUpdate(T t) {
+        if(contains(t)){
+            update(t);
+        }else {
+            save(t);
+        }
+    }
+
+    @Override
+    public T get(long id) {
+        String sql = "select * from "+tableName+" where id = "+id;
+
+        return null;
+    }
+
+    @Override
+    public boolean delete(T t) {
+        return false;
     }
 
     @Override
@@ -217,102 +103,78 @@ public class BaseDaoImpl<T extends BaseModel> implements IBaseDao<T> {
 
     }
 
-
-
-    private void fillPreparedStatement(T t, PreparedStatement preparedStatement, List<String> fieldNames) {
-        int length = fieldNames.size();
-        for(int i=0; i<length; i++) {
-            try {
-                Method method = entityClass.getMethod("get" + firstCharToUpperCase(fieldNames.get(i)), void.class);
-                preparedStatement.setObject(i+1, method.invoke(t));
-            }catch (Exception e){
-                // TODO: 16-9-20
-                e.printStackTrace();
-            }
-        }
+    @Override
+    public void update(T t) {
     }
 
     @Override
-    public void excuteSQL(String sql, Object[] values) {
-        Connection connection = null;
-        PreparedStatement preparedStatement = null;
+    public void executeSQL(String sql, Object[] values) {
+        Connection connection = JDBCUtils.getConnection();
         try {
-            connection = JDBCUtils.getConnection();
-            preparedStatement = connection.prepareStatement(sql);
-            int i =1;
-            for(Object o : values){
-                preparedStatement.setObject(i,o);
+            PreparedStatement preparedStatement = connection.prepareStatement(sql);
+            for (int j = 0; j < values.length; j++) {
+                preparedStatement.setObject(j+1, values[j]);
             }
             preparedStatement.execute();
-            JDBCUtils.release(preparedStatement);
+        }catch (SQLException e){
+            // TODO: 16-9-29
+            e.printStackTrace();
+        }
+
+    }
+
+    @Override
+    public int executeUpdateSQL(String sql, Object[] values) {
+        Connection connection = JDBCUtils.getConnection();
+        int succeed = 0;
+        try {
+            PreparedStatement preparedStatement = connection.prepareStatement(sql);
+            for (int j = 0; j < values.length; j++) {
+                preparedStatement.setObject(j+1, values[j]);
+            }
+            succeed = preparedStatement.executeUpdate();
         }catch (SQLException e){
             e.printStackTrace();
-        }finally {
-                JDBCUtils.release(connection);
         }
+        return succeed;
+    }
+
+    @Override
+    public ResultSet executeQuerySQL(String sql, Object[] values){
+        Connection connection = JDBCUtils.getConnection();
+        ResultSet resultSet = null;
+        try {
+            PreparedStatement preparedStatement = connection.prepareStatement(sql);
+            for (int j = 0; j < values.length; j++) {
+                preparedStatement.setObject(j+1, values[j]);
+            }
+            resultSet = preparedStatement.executeQuery();
+        }catch (SQLException e){
+            // TODO: 16-9-29
+            e.printStackTrace();
+        }
+
+        return resultSet;
     }
 
     @Override
     public T getBySQL(String sql, Object[] values) {
-
+        List<T> resultList = getListBySQL(sql, values);
+        if(resultList.size() > 0){
+            return resultList.get(0);
+        }
         return null;
     }
 
     @Override
     public List<T> getListBySQL(String sql, Object[] values) {
-        List<T> result = new ArrayList<>();
-        Connection connection = null;
-        PreparedStatement preparedStatement = null;
-        ResultSet resultSet;
-        try {
-            connection = JDBCUtils.getConnection();
-            preparedStatement = connection.prepareStatement(sql);
-            int i =1;
-            for(Object o : values){
-                preparedStatement.setObject(i,o);
-            }
-            resultSet = preparedStatement.executeQuery();
+        ResultSet resultSet = executeQuerySQL(sql, values);
 
-            // TODO: 16-9-20
-        }catch (SQLException e){
-            e.printStackTrace();
-        }finally {
-            JDBCUtils.release(connection);
-        }
-        return null;
-    }
 
-    private List<String> getPersistenceFiledsName(){
+        List<Map<String, Object>> mapList = handleResultSetToMapList(resultSet);
+        List<T> result = transferMapListToBeanList(mapList);
 
-        List<String> persistenceFileds = new ArrayList<>();
-
-        for(Field field : ReflectUtils.getAllFields(entityClass)){
-            Annotation[] annotations = field.getDeclaredAnnotations();
-            for(Annotation annotation : annotations){
-                if(annotation instanceof Persistence){
-                    persistenceFileds.add(field.getName());
-                    break;
-                }
-            }
-        }
-
-        return Collections.unmodifiableList(persistenceFileds);
-    }
-
-    private List<String> getManyToManyFiledsName(){
-        List<String> manyToManyFileds = new ArrayList<>();
-
-        for(Field field : ReflectUtils.getAllFields(entityClass)){
-            Annotation[] annotations = field.getDeclaredAnnotations();
-            for(Annotation annotation : annotations){
-                if(annotation instanceof ManyToMany){
-                    manyToManyFileds.add(field.getName());
-                    break;
-                }
-            }
-        }
-
-        return Collections.unmodifiableList(manyToManyFileds);
+        return result;
     }
 
     private String firstCharToUpperCase(String s){
@@ -322,6 +184,110 @@ public class BaseDaoImpl<T extends BaseModel> implements IBaseDao<T> {
         }
         charArray[0]-=32;
         return String.valueOf(charArray);
+    }
+
+    private Object getObjectByFieldName(T t, String fieldName){
+        try {
+            Method method = entityClass.getMethod("get" + firstCharToUpperCase(fieldName), void.class);
+            Object obj;
+            if (method.getReturnType().getSimpleName().contains("Date")) {
+                SimpleDateFormat sbf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+                obj = sbf.format(method.invoke(t));
+            }else {
+                obj = method.invoke(t);
+            }
+            return obj;
+        }catch (Exception e){
+            // TODO: 16-9-29
+            throw new RuntimeException(e);
+        }
+    }
+
+    private List<Map<String, Object>> handleResultSetToMapList(ResultSet resultSet){
+        List<Map<String, Object>> values = new ArrayList<>();
+        List<String> columnLabels = getColumnLabels(resultSet);
+        Map<String, Object> map = null;
+        // 处理 ResultSet, 使用 while 循环
+        try {
+            while (resultSet.next()) {
+                map = new HashMap<>();
+
+                for (String columnLabel : columnLabels) {
+                    Object value = resultSet.getObject(columnLabel);
+                    map.put(columnLabel, value);
+                }
+
+                //把一条记录的一个 Map 对象放入 5 准备的 List 中
+                values.add(map);
+            }
+        }catch (SQLException e){
+            // TODO: 16-9-29
+            e.printStackTrace();
+        }
+
+        return values;
+    }
+
+    private List<String> getColumnLabels(ResultSet resultSet){
+        List<String> labels = new ArrayList<>();
+
+        try {
+            ResultSetMetaData rsmd = resultSet.getMetaData();
+            for (int i = 0; i < rsmd.getColumnCount(); i++) {
+                labels.add(rsmd.getColumnLabel(i + 1));
+            }
+        }catch (SQLException e){
+            // TODO: 16-9-29
+            e.printStackTrace();
+        }
+
+
+        return labels;
+    }
+
+    private List<T> transferMapListToBeanList(List<Map<String, Object>> values){
+        List<T> result = new ArrayList<>();
+
+        T bean = null;
+        if (values.size() > 0) {
+            for (Map<String, Object> m : values) {
+                //通过反射创建一个其他类的对象
+                try {
+                    bean = entityClass.newInstance();
+                }catch (IllegalAccessException e){
+                    // TODO: 16-9-29
+                    e.printStackTrace();
+                }catch (InstantiationException e){
+                    // TODO: 16-9-29
+                    e.printStackTrace();
+                }
+
+
+                for (Map.Entry<String, Object> entry : m.entrySet()) {
+                    String propertyName = entry.getKey();
+                    Object value = entry.getValue();
+
+                    try {
+                        Field f =bean.getClass().getDeclaredField(propertyName);
+                        f.setAccessible(true);
+                        f.set(bean, value);
+                    }catch (NoSuchFieldException e){
+                        // TODO: 16-9-29
+                        e.printStackTrace();
+                    }catch (IllegalAccessException e){
+                        // TODO: 16-9-29
+                        e.printStackTrace();
+                    }
+
+
+                }
+                //把 Object 对象放入到 list 中.
+                result.add(bean);
+            }
+        }
+
+        return result;
+
     }
 
 }

@@ -1,41 +1,23 @@
-package com.husama.model;
-
-import com.husama.annotation.dao.ManyToMany;
-import com.husama.annotation.dao.Persistence;
-
-import java.util.HashSet;
-import java.util.Set;
-import java.util.TreeSet;
+package com.husama.dao.entity;
 
 import static com.husama.constant.FormatType.*;
 
 /**
- * Created by husama on 16-8-28.
+ * Created by husama on 16-9-26.
  */
-public class Article extends BaseModel{
+public class Article extends BaseEntity{
 
-    @Persistence
+
     private String title;
 
-    @Persistence
     private String content;//原始内容
 
-    @Persistence
     private String renderedContent;//渲染后的内容
 
-    @Persistence
     private String format = FORMAT_MARKDOWN;//渲染方式默认为markdown
 
-    @ManyToMany
-    private Set<Tag> tags = new HashSet<>();
-
-    @ManyToMany
-    private Set<Comment> comments = new TreeSet<>();
-
-    @Persistence
     private int viewCount;
 
-    @Persistence
     private String link;
 
     public String getTitle() {
@@ -74,21 +56,6 @@ public class Article extends BaseModel{
         this.format = format;
     }
 
-    public Set<Tag> getTags() {
-        return tags;
-    }
-
-    public void setTags(Set<Tag> tags) {
-        this.tags = tags;
-    }
-
-    public Set<Comment> getComments() {
-        return comments;
-    }
-
-    public void setComments(Set<Comment> comments) {
-        this.comments = comments;
-    }
 
     public int getViewCount() {
         return viewCount;

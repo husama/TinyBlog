@@ -47,6 +47,7 @@ public class JDBCPool implements DataSource{
             }
 
         }catch (Exception e){
+            // TODO: 16-9-29  
             throw new ExceptionInInitializerError(e);
         }
     }
